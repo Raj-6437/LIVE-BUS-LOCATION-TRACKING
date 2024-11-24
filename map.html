@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Bus Location Map with Route</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #map {
+            height: 100%;
+        }
+        .route-controls {
+            display: flex;
+            justify-content: center;
+            position: absolute;
+            top: 20px;
+            z-index: 1000;
+            width: 100%;
+        }
+        .route-controls input, .route-controls button {
+            margin: 5px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        .search-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            top: 80px;
+            width: 100%;
+            z-index: 1000;
+        }
+        .suggestions {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 1001;
+            width: 350px;
+            display: none;
+            border-radius: 5px;
+        }
+        .suggestions div {
+            padding: 10px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .suggestions div:hover {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="route-controls">
+        <input type="text" id="departure" placeholder="Departure (Lat,Lng)" />
+        <input type="text" id="arrival" placeholder="Arrival (Lat,Lng)" />
+        <button onclick="showRoute()">Show Route</button>
+    </div>
+    
+    <div class="search-container">
+        <input type="text" id="busStopSearch" placeholder="Search Bus Stop" autocomplete="off" />
+        <div class="suggestions" id="suggestions"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+    <script>
+        const map = L.map('map').setView([17.6841, 73.9930], 13);
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const busStops = [
+            { name: "MIDC Satara", coords: [17.6892, 73.9771] },
+            { name: "Godoli Naka", coords: [17.6867, 73.9751] },
+            { name: "Satara ST Stand", coords: [17.6832, 73.9964] },
+            { name: "Satara City Bus Stand", coords: [17.6823, 73.9921] },
+            // Add more bus stops as needed
+        ];
+
+        let busStopMarkers = [];
+        let routeControl = null;
+
+        // Function to add bus stops to the map
+        function addBusStops() {
+            busStops.forEach(stop => {
+                const marker = L.marker(stop.coords).bindPopup(stop.name);
+                marker.addTo(map);
+                busStopMarkers.push(marker);
+            });
+        }
+
+        addBusStops();
+
+        // Function to show route between two locations
+        function showRoute() {
+            const departureInput = document.getElementById("departure").value.split(",");
+            const arrivalInput = document.getElementById("arrival").value.split(",");
+            const departureCoords = [parseFloat(departureInput[0]), parseFloat(departureInput[1])];
+            const arrivalCoords = [parseFloat(arrivalInput[0]), parseFloat(arrivalInput[1])];
+
+            if (routeControl) {
+                map.removeControl(routeControl);
+            }
+
+            routeControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(departureCoords),
+                    L.latLng(arrivalCoords)
+                ],
+                routeWhileDragging: true,
+                createMarker: (i, waypoint) => {
+                    const iconUrl = i === 0 ? 
+                        'https://img.icons8.com/ios-filled/50/007bff/marker-s.png' : 
+                        'https://img.icons8.com/ios-filled/50/007bff/marker-a.png';
+                    return L.marker(waypoint.latLng, { icon: L.icon({ iconUrl, iconSize: [30, 30] }) });
+                },
+                lineOptions: { styles: [{ color: '#007bff', opacity: 0.7, weight: 5 }] }
+            }).addTo(map);
+        }
+
+        // Search functionality for bus stops
+        const busStopSearch = document.getElementById('busStopSearch');
+        const suggestions = document.getElementById('suggestions');
+
+        busStopSearch.addEventListener('input', () => {
+            const inputValue = busStopSearch.value.toLowerCase();
+            suggestions.innerHTML = '';
+            suggestions.style.display = 'none';
+            if (inputValue) {
+                const filteredStops = busStops.filter(stop => stop.name.toLowerCase().includes(inputValue));
+                filteredStops.forEach(stop => {
+                    const suggestionDiv = document.createElement('div');
+                    suggestionDiv.textContent = stop.name;
+                    suggestionDiv.addEventListener('click', () => {
+                        busStopSearch.value = stop.name;
+                        map.setView(stop.coords, 15);
+                        L.popup().setLatLng(stop.coords).setContent(stop.name).openOn(map);
+                        suggestions.innerHTML = '';
+                        suggestions.style.display = 'none';
+                    });
+                    suggestions.appendChild(suggestionDiv);
+                });
+                if (filteredStops.length > 0) {
+                    suggestions.style.display = 'block';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
